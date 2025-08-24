@@ -1,48 +1,35 @@
 pipeline {
-  agent any
+    agent any
 
-  stages {
-    stage('Checkout') {
-      steps {
-        git url: 'https://github.com/nhathoang1505/jenkins-demo2.git', branch: 'main'
-      }
-    }
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/USERNAME/demo2.git'
+            }
+        }
 
-    stage('Build') {
-      steps {
-        bat '''
-        javac -d . src\\WebServer.java
-        '''
-      }
-    }
+        stage('Build') {
+            steps {
+                bat 'javac WebServer.java'
+            }
+        }
 
-    stage('Run') {
-      steps {
-        bat 'start /B java WebServer'
-      }
-    }
+        stage('Deploy') {
+            steps {
+                powershell '''
+                    # Kill old process on port 8081 if exists
+                    $proc = Get-NetTCPConnection -LocalPort 8081 -ErrorAction SilentlyContinue
+                    if ($proc) {
+                        Stop-Process -Id $proc.OwningProcess -Force
+                        Write-Output "Stopped old server on port 8081"
+                    }
 
-    stage('Test') {
-      steps {
-        bat '''
-        ping -n 5 127.0.0.1 >nul
-        curl http://localhost:8081
-        '''
-      }
+                    # Start server in background
+                    Start-Process java -ArgumentList "WebServer"
+                    Write-Output "Started new server on port 8081"
+                '''
+            }
+        }
     }
-  }
-
-  post {
-    always {
-      bat '''
-      @echo off
-      setlocal
-      echo Cleaning up port 8081...
-      for /f "tokens=5" %%p in ('netstat -ano ^| findstr /R /C:"TCP.*:8081.*LISTENING"') do (
-        taskkill /PID %%p /F /T >nul 2>&1
-      )
-      exit /b 0
-      '''
-    }
-  }
 }
+
